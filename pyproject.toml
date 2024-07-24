@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "es-utils"
+version = "0.1.0"
+description = "Collection of functions for reading and saving into ElasticSearch database."
+authors = ["l080 <rafal.wilk92@pm.me>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+elasticsearch = "^8.14.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.4.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
