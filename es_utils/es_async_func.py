@@ -1,9 +1,9 @@
-from .client import es_async
 import logging
 from elasticsearch import exceptions as es_exceptions
 
 
 async def add_document_to_index(index_name: str ,doc: dict) -> bool:
+    from .client import es_async
     """
     Adds a document to the specified Elasticsearch index.
 
@@ -29,6 +29,7 @@ async def add_document_to_index(index_name: str ,doc: dict) -> bool:
         return False
 
 async def document_exists_in_es(index_name: str, doc_id: str) -> bool:
+    from .client import es_async
     """Check if a document exists in Elasticsearch index.
 
     Args:

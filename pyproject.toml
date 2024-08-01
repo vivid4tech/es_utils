@@ -9,6 +9,8 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.11"
 elasticsearch = "^8.14.0"
+pytest = "^8.3.1"
+pytest-asyncio = "^0.23.8"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.4.2"

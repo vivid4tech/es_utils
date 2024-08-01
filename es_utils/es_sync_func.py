@@ -1,10 +1,10 @@
 import logging
 import json
 from elasticsearch import exceptions as es_exceptions
-from .client import es_sync
 from typing import Union, Dict
 
 def test_es_connection() -> bool:
+    from .client import es_sync
     """
     Test connection to Elasticsearch and log the information.
 
@@ -24,6 +24,7 @@ def test_es_connection() -> bool:
 
 
 def create_index(index_name: str) -> int:
+    from .client import es_sync
     """
     Create Elasticsearch index if it does not exist.
 
@@ -54,6 +55,7 @@ def create_index(index_name: str) -> int:
 
 
 def add_doc_to_index(index_name: str, doc: Dict[str, Union[str, int]]) -> bool:
+    from .client import es_sync
     """
     Add document to Elasticsearch index.
 
@@ -80,6 +82,7 @@ def add_doc_to_index(index_name: str, doc: Dict[str, Union[str, int]]) -> bool:
 
 
 def doc_exist_in_es(index_name: str, doc_id: str) -> bool:
+    from .client import es_sync
     """Check if a document exists in Elasticsearch index.
 
     Args:
@@ -98,6 +101,7 @@ def doc_exist_in_es(index_name: str, doc_id: str) -> bool:
 
 
 def get_last_doc_id(index_name: str) -> Union[str, int]:
+    from .client import es_sync
     """
     Get the last document ID from Elasticsearch.
 
