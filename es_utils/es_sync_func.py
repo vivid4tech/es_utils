@@ -38,8 +38,13 @@ def create_index(index_name: str) -> int:
     """
     try:
         if not es_sync.indices.exists(index=index_name):
-            with open("json/settings.json", "r") as file:
-                index_config = json.load(file)
+            try:
+                with open("json/settings.json", "r") as file:
+                    index_config = json.load(file)
+            except FileNotFoundError as fnf_error:
+                logging.error(f"Settings file not found: {fnf_error}")
+                return -1
+
             es_sync.indices.create(index=index_name, ignore=400, body=index_config)
             logging.info(f'Created index {index_name}')
             return 1
