@@ -1,6 +1,6 @@
 import logging
 from elasticsearch import exceptions as es_exceptions
-
+from typing import Union, Dict
 
 async def add_document_to_index(index_name: str ,doc: dict) -> bool:
     from .client import es_async
@@ -27,21 +27,62 @@ async def add_document_to_index(index_name: str ,doc: dict) -> bool:
     except es_exceptions.RequestError as e:
         logging.error(f"Failed to index document. Error: {e}")
         return False
-
-async def document_exists_in_es(index_name: str, doc_id: str) -> bool:
+ 
+async def sync_document(index_name: str, doc_source: Dict[str, Union[str, int]], doc_es: Dict[str, Union[str, int]]) -> bool:
     from .client import es_async
-    """Check if a document exists in Elasticsearch index.
+    """
+    Sync document with Elasticsearch index. If the document exists and is different, update it.
+
+    Args:
+        index_name (str): The name of the Elasticsearch index.
+        doc_source (Dict[str, Union[str, int]]): The source document to be synced.
+        doc_es (Dict[str, Union[str, int]]): The existing document from Elasticsearch to compare with the source document.
+
+    Returns:
+        bool: True if the document was successfully synced, False otherwise.
+    """
+    try:
+        doc_id = doc_source.get('id', None)
+        if not doc_id:
+            logging.warning(f"Document does not contain an 'id' field. Document: {doc_source}")
+            return False
+        if doc_source != doc_es:
+            logging.info(f"Document with id {doc_id}. New version found. Updating document.")
+            # Update the document if they are different
+            update_response = await es_async.index(index=index_name, id=doc_id, document=doc_source)
+            if update_response.get('result') in ['created', 'updated']:
+                logging.info(f"Document with id {doc_id} has been updated.")
+                return True
+            logging.error(f"Failed to update document with id {doc_id}. Response: {update_response}")
+            return False
+        else:
+            logging.info(f"Document with id {doc_id} is already up-to-date.")
+            return True
+    except es_exceptions.RequestError as e:
+        logging.error(f"Document with id {doc_id} failed to sync. Error: {e}")
+        return False
+    except Exception as e:
+        logging.error(f"An unexpected error occurred while syncing document with id {doc_id}. Error: {e}")
+        return False
+
+async def document_exists_in_es(index_name: str, doc_id: str) -> Union[Dict, None]:
+    from .client import es_async
+    """Check if a document exists in Elasticsearch index and return the document if it exists.
 
     Args:
         index_name (str): The name of the Elasticsearch index.
         doc_id (str): The ID of the document to check.
 
     Returns:
-        bool: True if the document exists, False otherwise.
+        Union[Dict, None]: The document if it exists, None otherwise.
     """
     try:
         response = await es_async.get(index=index_name, id=doc_id, ignore=404)
-        return response and response.get('found', False)
+        if response and response.get('found', False):
+            logging.info(f"Document with id {doc_id} already exists in Elasticsearch.")
+            return response['_source']
+        logging.info(f"Document with id {doc_id} does not exist in Elasticsearch.")
+        return None
     except Exception as e:
         logging.error(f"Failed to check existence of document with id {doc_id}. Error: {e}")
-        return False
+        return None
