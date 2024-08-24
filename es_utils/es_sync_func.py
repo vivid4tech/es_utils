@@ -131,3 +131,32 @@ def get_last_doc_id(index_name: str) -> Union[str, int]:
     except Exception as e:
         logging.error(f"Failed to get last document ID: {e}. Possibly elasticsearch db is empty.")
         return 0
+
+def get_latest_value(index_name: str, field_name: str) -> str:
+    from .client import es_sync
+
+    """
+    Get the latest value for a specified field from Elasticsearch.
+
+    Args:
+        index_name (str): The name of the Elasticsearch index.
+        field_name (str): The field name to retrieve the latest value for.
+
+    Returns:
+        str: The latest value for the specified field.
+
+    Raises:
+        Exception: If there is an error while retrieving the data.
+    """
+    query = {
+        "size": 1,
+        "sort": [{field_name: {"order": "desc"}}],
+        "_source": [field_name]
+    }
+    try:
+        response = es_sync.search(index=index_name, body=query)
+        if response['hits']['hits']:
+            return response['hits']['hits'][0]['_source'][field_name]
+    except Exception as e:
+        logging.error(f"Failed to get the latest '{field_name}': {e}")
+        return None
