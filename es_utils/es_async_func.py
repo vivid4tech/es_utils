@@ -25,7 +25,7 @@ async def add_document_to_index(index_name: str ,doc: dict) -> bool:
             return True
         return False
     except es_exceptions.RequestError as e:
-        logging.error(f"Failed to index document. Error: {e}")
+        logging.error(f"Failed to index document {doc_id}. Error: {e}")
         return False
  
 async def sync_document(index_name: str, doc_source: Dict[str, Union[str, int]], doc_es: Dict[str, Union[str, int]]) -> bool:
@@ -85,4 +85,36 @@ async def document_exists_in_es(index_name: str, doc_id: str) -> Union[Dict, Non
         return None
     except Exception as e:
         logging.error(f"Failed to check existence of document with id {doc_id}. Error: {e}")
+        return None
+    
+async def count_doc_es(index_name: str, field_name: str, field_value: str) -> Union[int, None]:
+    from .client import es_async
+    """
+    Count the number of documents in an Elasticsearch index where the given field matches a specific value.
+
+    Args:
+        index_name (str): The name of the Elasticsearch index.
+        field_name (str): The field to query.
+        field_value (str): The value to match for the field.
+
+    Returns:
+        Union[int, None]: The count of documents if successful, None otherwise.
+    """
+    query = {
+        "query": {
+            "term": {
+                field_name: field_value
+            }
+        }
+    }
+
+    try:
+        response = await es_async.count(index=index_name, body=query)
+        if response and 'count' in response:
+            logging.info(f"Found {response['count']} documents in index {index_name} where {field_name} = {field_value}.")
+            return response['count']
+        logging.info(f"No documents found in index {index_name} where {field_name} = {field_value}.")
+        return 0
+    except Exception as e:
+        logging.error(f"Failed to count documents in index {index_name}. Error: {e}")
         return None
