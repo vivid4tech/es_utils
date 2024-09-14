@@ -220,9 +220,13 @@ def sync_document(index_name: str, doc_source: Dict[str, Union[str, int]]) -> bo
             return False
 
         # Check if the document exists
-        existing_doc = es_sync.get(index=index_name, id=doc_id, ignore=404)
+        try:
+            existing_doc = es_sync.get(index=index_name, id=doc_id)
+            doc_exists = True
+        except es_exceptions.NotFoundError:
+            doc_exists = False
         
-        if existing_doc['found']:
+        if doc_exists:
             doc_es = existing_doc['_source']
             if doc_source != doc_es:
                 logging.info(f"Document with id {doc_id}. New version found. Updating document.")
