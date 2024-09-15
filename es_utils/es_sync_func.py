@@ -22,7 +22,6 @@ def test_es_connection() -> bool:
         logging.error(f"An error occurred while connecting to Elasticsearch: {e}")
         return False
 
-
 def create_index(index_name: str) -> int:
     from .client import es_sync
     """
@@ -58,7 +57,6 @@ def create_index(index_name: str) -> int:
         logging.error(f'An error occurred: {err}')
         return -1
 
-
 def add_doc_to_index(index_name: str, doc: Dict[str, Union[str, int]]) -> bool:
     from .client import es_sync
     """
@@ -85,7 +83,6 @@ def add_doc_to_index(index_name: str, doc: Dict[str, Union[str, int]]) -> bool:
         logging.error(f"Failed to index document {doc_id}. Error: {e}")
         return False
 
-
 def doc_exist_in_es(index_name: str, doc_id: str) -> bool:
     from .client import es_sync
     """Check if a document exists in Elasticsearch index.
@@ -108,9 +105,6 @@ def doc_exist_in_es(index_name: str, doc_id: str) -> bool:
     except Exception as e:
         logging.error(f"Failed to check existence of document with id {doc_id}. Error: {e}")
         return False
-
-from typing import Union
-import logging
 
 def count_doc_es(index_name: str, field_name: str, field_value: str) -> Union[int, None]:
     from .client import es_sync
@@ -143,7 +137,6 @@ def count_doc_es(index_name: str, field_name: str, field_value: str) -> Union[in
     except Exception as e:
         logging.error(f"Failed to count documents in index {index_name}. Error: {e}")
         return None
-
 
 def get_last_doc_id(index_name: str) -> Union[str, int]:
     from .client import es_sync
