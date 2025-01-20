@@ -2,11 +2,12 @@ from elasticsearch import AsyncElasticsearch
 from elasticsearch import Elasticsearch
 
 
-if 'es_async' not in globals():
+if "es_async" not in globals():
     es_async = None
 
-if 'es_sync' not in globals():
+if "es_sync" not in globals():
     es_sync = None
+
 
 def initialize_es_clients(es_connection_params: dict) -> None:
     """

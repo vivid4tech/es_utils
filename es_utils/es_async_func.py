@@ -2,8 +2,10 @@ import logging
 from elasticsearch import exceptions as es_exceptions
 from typing import Union, Dict
 
-async def add_document_to_index(index_name: str ,doc: dict) -> bool:
+
+async def add_document_to_index(index_name: str, doc: dict) -> bool:
     from .client import es_async
+
     """
     Adds a document to the specified Elasticsearch index.
 
@@ -15,21 +17,27 @@ async def add_document_to_index(index_name: str ,doc: dict) -> bool:
         bool: True if the document was successfully added, False otherwise.
     """
     try:
-        doc_id = doc.get('id', None)
+        doc_id = doc.get("id", None)
         if not doc_id:
             logging.warning(f"Document does not contain an 'id' field. Document: {doc}")
             return False
-        
+
         response = await es_async.index(index=index_name, id=doc_id, document=doc)
-        if response.get('result') in ['created', 'updated']:
+        if response.get("result") in ["created", "updated"]:
             return True
         return False
     except es_exceptions.RequestError as e:
         logging.error(f"Failed to index document {doc_id}. Error: {e}")
         return False
- 
-async def sync_document(index_name: str, doc_source: Dict[str, Union[str, int]], doc_es: Dict[str, Union[str, int]]) -> bool:
+
+
+async def sync_document(
+    index_name: str,
+    doc_source: Dict[str, Union[str, int]],
+    doc_es: Dict[str, Union[str, int]],
+) -> bool:
     from .client import es_async
+
     """
     Sync document with Elasticsearch index. If the document exists and is different, update it.
 
@@ -42,18 +50,26 @@ async def sync_document(index_name: str, doc_source: Dict[str, Union[str, int]],
         bool: True if the document was successfully synced, False otherwise.
     """
     try:
-        doc_id = doc_source.get('id', None)
+        doc_id = doc_source.get("id", None)
         if not doc_id:
-            logging.warning(f"Document does not contain an 'id' field. Document: {doc_source}")
+            logging.warning(
+                f"Document does not contain an 'id' field. Document: {doc_source}"
+            )
             return False
         if doc_source != doc_es:
-            logging.info(f"Document with id {doc_id}. New version found. Updating document.")
+            logging.info(
+                f"Document with id {doc_id}. New version found. Updating document."
+            )
             # Update the document if they are different
-            update_response = await es_async.index(index=index_name, id=doc_id, document=doc_source)
-            if update_response.get('result') in ['created', 'updated']:
+            update_response = await es_async.index(
+                index=index_name, id=doc_id, document=doc_source
+            )
+            if update_response.get("result") in ["created", "updated"]:
                 logging.info(f"Document with id {doc_id} has been updated.")
                 return True
-            logging.error(f"Failed to update document with id {doc_id}. Response: {update_response}")
+            logging.error(
+                f"Failed to update document with id {doc_id}. Response: {update_response}"
+            )
             return False
         else:
             logging.info(f"Document with id {doc_id} is already up-to-date.")
@@ -62,11 +78,15 @@ async def sync_document(index_name: str, doc_source: Dict[str, Union[str, int]],
         logging.error(f"Document with id {doc_id} failed to sync. Error: {e}")
         return False
     except Exception as e:
-        logging.error(f"An unexpected error occurred while syncing document with id {doc_id}. Error: {e}")
+        logging.error(
+            f"An unexpected error occurred while syncing document with id {doc_id}. Error: {e}"
+        )
         return False
+
 
 async def document_exists_in_es(index_name: str, doc_id: str) -> Union[Dict, None]:
     from .client import es_async
+
     """Check if a document exists in Elasticsearch index and return the document if it exists.
 
     Args:
@@ -78,17 +98,23 @@ async def document_exists_in_es(index_name: str, doc_id: str) -> Union[Dict, Non
     """
     try:
         response = await es_async.get(index=index_name, id=doc_id, ignore=404)
-        if response and response.get('found', False):
+        if response and response.get("found", False):
             logging.info(f"Document with id {doc_id} already exists in Elasticsearch.")
-            return response['_source']
+            return response["_source"]
         logging.info(f"Document with id {doc_id} does not exist in Elasticsearch.")
         return None
     except Exception as e:
-        logging.error(f"Failed to check existence of document with id {doc_id}. Error: {e}")
+        logging.error(
+            f"Failed to check existence of document with id {doc_id}. Error: {e}"
+        )
         return None
-    
-async def count_doc_es(index_name: str, field_name: str, field_value: str) -> Union[int, None]:
+
+
+async def count_doc_es(
+    index_name: str, field_name: str, field_value: str
+) -> Union[int, None]:
     from .client import es_async
+
     """
     Count the number of documents in an Elasticsearch index where the given field matches a specific value.
 
@@ -100,20 +126,18 @@ async def count_doc_es(index_name: str, field_name: str, field_value: str) -> Un
     Returns:
         Union[int, None]: The count of documents if successful, None otherwise.
     """
-    query = {
-        "query": {
-            "term": {
-                field_name: field_value
-            }
-        }
-    }
+    query = {"query": {"term": {field_name: field_value}}}
 
     try:
         response = await es_async.count(index=index_name, body=query)
-        if response and 'count' in response:
-            logging.info(f"Found {response['count']} documents in index {index_name} where {field_name} = {field_value}.")
-            return response['count']
-        logging.info(f"No documents found in index {index_name} where {field_name} = {field_value}.")
+        if response and "count" in response:
+            logging.info(
+                f"Found {response['count']} documents in index {index_name} where {field_name} = {field_value}."
+            )
+            return response["count"]
+        logging.info(
+            f"No documents found in index {index_name} where {field_name} = {field_value}."
+        )
         return 0
     except Exception as e:
         logging.error(f"Failed to count documents in index {index_name}. Error: {e}")
