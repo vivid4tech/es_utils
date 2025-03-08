@@ -276,3 +276,49 @@ def sync_document(index_name: str, doc_source: Dict[str, Union[str, int]]) -> bo
             f"An unexpected error occurred while syncing document with id {doc_id}. Error: {e}"
         )
         return False
+
+def get_latest_es_doc_info(index_name):
+    """
+    Get the largest document ID and latest publication date from Elasticsearch.
+    These may come from different documents.
+    
+    Args:
+        index_name (str): The name of the Elasticsearch index
+        
+    Returns:
+        Tuple[int, Optional[str]]: Tuple containing (largest_id, latest_dt_wyd)
+    """
+    from .client import es_sync
+    
+    try:
+        # Get document with highest ID
+        id_query = {
+            "size": 1,
+            "sort": [{"id": {"order": "desc"}}],
+            "_source": False
+        }
+        id_response = es_sync.search(index=index_name, body=id_query)
+        
+        largest_id = 0
+        if id_response["hits"]["hits"]:
+            largest_id = int(id_response["hits"]["hits"][0]["_id"])
+            
+        # Get document with latest publication date
+        date_query = {
+            "size": 1,
+            "sort": [{"dokument.DT_WYD": {"order": "desc"}}],
+            "_source": ["dokument.DT_WYD"]
+        }
+        date_response = es_sync.search(index=index_name, body=date_query)
+        
+        latest_dt_wyd = None
+        if date_response["hits"]["hits"]:
+            source = date_response["hits"]["hits"][0]["_source"]
+            if "dokument" in source and "DT_WYD" in source["dokument"]:
+                latest_dt_wyd = source["dokument"]["DT_WYD"]
+        
+        return largest_id, latest_dt_wyd
+        
+    except Exception as e:
+        logging.error(f"Error getting latest document info from Elasticsearch: {e}")
+        return 0, None
