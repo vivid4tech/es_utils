@@ -1,7 +1,7 @@
 import logging
 import json
 from elasticsearch import exceptions as es_exceptions
-from typing import Union, Dict
+from typing import Union, Dict, Optional, Tuple
 
 
 def test_es_connection() -> bool:
@@ -48,14 +48,15 @@ def create_index(index_name: str) -> int:
                 logging.error(f"Settings file not found: {fnf_error}")
                 return -1
 
-            es_sync.indices.create(index=index_name, ignore=400, body=index_config)
+            # Use ignore parameter directly
+            es_sync.indices.create(index=index_name, body=index_config, ignore=400)
             logging.info(f"Created index {index_name}")
             return 1
         else:
             logging.info(f"Index {index_name} already exists")
             return 0
     except es_exceptions.ConnectionError as err:
-        logging.error(f"Error connecting to Elasticsearch: {err}")
+        logging.warning(f"Connection error while creating index, client will retry: {err}")
         return -1
     except Exception as err:
         logging.error(f"An error occurred: {err}")
@@ -81,12 +82,25 @@ def add_doc_to_index(index_name: str, doc: Dict[str, Union[str, int]]) -> bool:
             logging.warning(f"Document does not contain an 'id' field. Document: {doc}")
             return False
 
-        response = es_sync.index(index=index_name, id=doc_id, document=doc)
+        # Convert doc_id to string to fix type error
+        doc_id_str = str(doc_id)
+        response = es_sync.index(index=index_name, id=doc_id_str, document=doc)
         if response.get("result") in ["created", "updated"]:
             return True
         return False
     except es_exceptions.RequestError as e:
         logging.error(f"Failed to index document {doc_id}. Error: {e}")
+        return False
+    except es_exceptions.ConnectionError as e:
+        # This is a connection error that the client will retry
+        logging.warning(f"Connection error while indexing document {doc_id}, client will retry: {e}")
+        raise
+    except es_exceptions.TransportError as e:
+        # This is a transport error that the client will retry
+        logging.warning(f"Transport error while indexing document {doc_id}, client will retry: {e}")
+        raise
+    except Exception as e:
+        logging.error(f"Unexpected error while indexing document {doc_id}: {e}")
         return False
 
 
@@ -103,6 +117,7 @@ def doc_exist_in_es(index_name: str, doc_id: str) -> bool:
         bool: True if the document exists, False otherwise.
     """
     try:
+        # Use ignore parameter directly
         response = es_sync.get(index=index_name, id=doc_id, ignore=404)
         if response and response.get("found", False):
             logging.info(f"Document {doc_id} already exists in index {index_name}")
@@ -110,6 +125,17 @@ def doc_exist_in_es(index_name: str, doc_id: str) -> bool:
         else:
             logging.info(f"Document {doc_id} does not exist in index {index_name}")
             return False
+    except es_exceptions.NotFoundError:
+        logging.info(f"Document {doc_id} does not exist in index {index_name}")
+        return False
+    except es_exceptions.ConnectionError as e:
+        # This is a connection error that the client will retry
+        logging.warning(f"Connection error while checking document {doc_id}, client will retry: {e}")
+        raise
+    except es_exceptions.TransportError as e:
+        # This is a transport error that the client will retry
+        logging.warning(f"Transport error while checking document {doc_id}, client will retry: {e}")
+        raise
     except Exception as e:
         logging.error(
             f"Failed to check existence of document with id {doc_id}. Error: {e}"
@@ -119,7 +145,7 @@ def doc_exist_in_es(index_name: str, doc_id: str) -> bool:
 
 def count_doc_es(
     index_name: str, field_name: str, field_value: str
-) -> Union[int, None]:
+) -> Optional[int]:
     from .client import es_sync
 
     """
@@ -131,7 +157,7 @@ def count_doc_es(
         field_value (str): The value to match for the field.
 
     Returns:
-        Union[int, None]: The count of documents if successful, None otherwise.
+        Optional[int]: The count of documents if successful, None otherwise.
     """
     query = {"query": {"term": {field_name: field_value}}}
 
@@ -146,6 +172,14 @@ def count_doc_es(
             f"No documents found in index {index_name} where {field_name} = {field_value}."
         )
         return 0
+    except es_exceptions.ConnectionError as e:
+        # This is a connection error that the client will retry
+        logging.warning(f"Connection error while counting documents, client will retry: {e}")
+        raise
+    except es_exceptions.TransportError as e:
+        # This is a transport error that the client will retry
+        logging.warning(f"Transport error while counting documents, client will retry: {e}")
+        raise
     except Exception as e:
         logging.error(f"Failed to count documents in index {index_name}. Error: {e}")
         return None
@@ -162,16 +196,21 @@ def get_last_doc_id(index_name: str) -> Union[str, int]:
 
     Returns:
         Union[str, int]: The last document ID as a string or integer.
-
-    Raises:
-        Exception: If there is an error while retrieving the last document ID.
-
     """
     query = {"size": 1, "sort": [{"id": {"order": "desc"}}]}
     try:
         response = es_sync.search(index=index_name, body=query)
         if response["hits"]["hits"]:
             return response["hits"]["hits"][0]["_id"]
+        return 0  # Return 0 if no documents found
+    except es_exceptions.ConnectionError as e:
+        # This is a connection error that the client will retry
+        logging.warning(f"Connection error while getting last document ID, client will retry: {e}")
+        raise
+    except es_exceptions.TransportError as e:
+        # This is a transport error that the client will retry
+        logging.warning(f"Transport error while getting last document ID, client will retry: {e}")
+        raise
     except Exception as e:
         logging.error(
             f"Failed to get last document ID: {e}. Possibly elasticsearch db is empty."
@@ -179,7 +218,7 @@ def get_last_doc_id(index_name: str) -> Union[str, int]:
         return 0
 
 
-def get_latest_value(index_name: str, field_name: str) -> str:
+def get_latest_value(index_name: str, field_name: str) -> Optional[str]:
     from .client import es_sync
 
     """
@@ -190,10 +229,7 @@ def get_latest_value(index_name: str, field_name: str) -> str:
         field_name (str): The field name to retrieve the latest value for.
 
     Returns:
-        str: The latest value for the specified field.
-
-    Raises:
-        Exception: If there is an error while retrieving the data.
+        Optional[str]: The latest value for the specified field, or None if not found.
     """
     query = {
         "size": 1,
@@ -204,6 +240,15 @@ def get_latest_value(index_name: str, field_name: str) -> str:
         response = es_sync.search(index=index_name, body=query)
         if response["hits"]["hits"]:
             return response["hits"]["hits"][0]["_source"][field_name]
+        return None  # Return None if no documents found
+    except es_exceptions.ConnectionError as e:
+        # This is a connection error that the client will retry
+        logging.warning(f"Connection error while getting latest value, client will retry: {e}")
+        raise
+    except es_exceptions.TransportError as e:
+        # This is a transport error that the client will retry
+        logging.warning(f"Transport error while getting latest value, client will retry: {e}")
+        raise
     except Exception as e:
         logging.error(f"Failed to get the latest '{field_name}': {e}")
         return None
@@ -230,12 +275,23 @@ def sync_document(index_name: str, doc_source: Dict[str, Union[str, int]]) -> bo
             )
             return False
 
+        # Convert doc_id to string to fix type error
+        doc_id_str = str(doc_id)
+        
         # Check if the document exists
         try:
-            existing_doc = es_sync.get(index=index_name, id=doc_id)
+            existing_doc = es_sync.get(index=index_name, id=doc_id_str)
             doc_exists = True
         except es_exceptions.NotFoundError:
             doc_exists = False
+        except es_exceptions.ConnectionError as e:
+            # This is a connection error that the client will retry
+            logging.warning(f"Connection error while checking document {doc_id}, client will retry: {e}")
+            raise
+        except es_exceptions.TransportError as e:
+            # This is a transport error that the client will retry
+            logging.warning(f"Transport error while checking document {doc_id}, client will retry: {e}")
+            raise
 
         if doc_exists:
             doc_es = existing_doc["_source"]
@@ -244,7 +300,7 @@ def sync_document(index_name: str, doc_source: Dict[str, Union[str, int]]) -> bo
                     f"Document with id {doc_id}. New version found. Updating document."
                 )
                 update_response = es_sync.index(
-                    index=index_name, id=doc_id, document=doc_source
+                    index=index_name, id=doc_id_str, document=doc_source
                 )
                 if update_response["result"] in ["created", "updated"]:
                     logging.info(f"Document with id {doc_id} has been updated.")
@@ -259,7 +315,7 @@ def sync_document(index_name: str, doc_source: Dict[str, Union[str, int]]) -> bo
         else:
             # Document doesn't exist, create it
             create_response = es_sync.index(
-                index=index_name, id=doc_id, document=doc_source
+                index=index_name, id=doc_id_str, document=doc_source
             )
             if create_response["result"] == "created":
                 logging.info(f"Document with id {doc_id} has been created.")
@@ -271,13 +327,21 @@ def sync_document(index_name: str, doc_source: Dict[str, Union[str, int]]) -> bo
     except es_exceptions.RequestError as e:
         logging.error(f"Document with id {doc_id} failed to sync. Error: {e}")
         return False
+    except es_exceptions.ConnectionError as e:
+        # This is a connection error that the client will retry
+        logging.warning(f"Connection error while syncing document {doc_id}, client will retry: {e}")
+        raise
+    except es_exceptions.TransportError as e:
+        # This is a transport error that the client will retry
+        logging.warning(f"Transport error while syncing document {doc_id}, client will retry: {e}")
+        raise
     except Exception as e:
         logging.error(
             f"An unexpected error occurred while syncing document with id {doc_id}. Error: {e}"
         )
         return False
 
-def get_latest_es_doc_info(index_name):
+def get_latest_es_doc_info(index_name: str) -> Tuple[int, Optional[str]]:
     """
     Get the largest document ID and latest publication date from Elasticsearch.
     These may come from different documents.
@@ -319,6 +383,14 @@ def get_latest_es_doc_info(index_name):
         
         return largest_id, latest_dt_wyd
         
+    except es_exceptions.ConnectionError as e:
+        # This is a connection error that the client will retry
+        logging.warning(f"Connection error while getting latest document info, client will retry: {e}")
+        raise
+    except es_exceptions.TransportError as e:
+        # This is a transport error that the client will retry
+        logging.warning(f"Transport error while getting latest document info, client will retry: {e}")
+        raise
     except Exception as e:
         logging.error(f"Error getting latest document info from Elasticsearch: {e}")
         return 0, None

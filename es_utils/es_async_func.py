@@ -1,6 +1,6 @@
 import logging
 from elasticsearch import exceptions as es_exceptions
-from typing import Union, Dict
+from typing import Union, Dict, Any, Optional
 
 
 async def add_document_to_index(index_name: str, doc: dict) -> bool:
@@ -22,13 +22,26 @@ async def add_document_to_index(index_name: str, doc: dict) -> bool:
             logging.warning(f"Document does not contain an 'id' field. Document: {doc}")
             return False
 
-        response = await es_async.index(index=index_name, id=doc_id, document=doc)
+        # Convert doc_id to string to fix type error
+        doc_id_str = str(doc_id)
+        response = await es_async.index(index=index_name, id=doc_id_str, document=doc)
         if response.get("result") in ["created", "updated"]:
             return True
         return False
     except es_exceptions.RequestError as e:
         logging.error(f"Failed to index document {doc_id}. Error: {e}")
         return False
+    except es_exceptions.ConnectionError as e:
+        # This is a connection error that the client will retry
+        logging.warning(f"Connection error while indexing document {doc_id}, client will retry: {e}")
+        raise
+    except es_exceptions.TransportError as e:
+        # This is a transport error that the client will retry
+        logging.warning(f"Transport error while indexing document {doc_id}, client will retry: {e}")
+        raise
+    except Exception as e:
+        logging.error(f"Unexpected error while indexing document {doc_id}: {e}")
+        raise
 
 
 async def sync_document(
@@ -60,9 +73,11 @@ async def sync_document(
             logging.info(
                 f"Document with id {doc_id}. New version found. Updating document."
             )
+            # Convert doc_id to string to fix type error
+            doc_id_str = str(doc_id)
             # Update the document if they are different
             update_response = await es_async.index(
-                index=index_name, id=doc_id, document=doc_source
+                index=index_name, id=doc_id_str, document=doc_source
             )
             if update_response.get("result") in ["created", "updated"]:
                 logging.info(f"Document with id {doc_id} has been updated.")
@@ -77,14 +92,22 @@ async def sync_document(
     except es_exceptions.RequestError as e:
         logging.error(f"Document with id {doc_id} failed to sync. Error: {e}")
         return False
+    except es_exceptions.ConnectionError as e:
+        # This is a connection error that the client will retry
+        logging.warning(f"Connection error while syncing document {doc_id}, client will retry: {e}")
+        raise
+    except es_exceptions.TransportError as e:
+        # This is a transport error that the client will retry
+        logging.warning(f"Transport error while syncing document {doc_id}, client will retry: {e}")
+        raise
     except Exception as e:
         logging.error(
             f"An unexpected error occurred while syncing document with id {doc_id}. Error: {e}"
         )
-        return False
+        raise
 
 
-async def document_exists_in_es(index_name: str, doc_id: str) -> Union[Dict, None]:
+async def document_exists_in_es(index_name: str, doc_id: str) -> Optional[Dict[str, Any]]:
     from .client import es_async
 
     """Check if a document exists in Elasticsearch index and return the document if it exists.
@@ -94,25 +117,39 @@ async def document_exists_in_es(index_name: str, doc_id: str) -> Union[Dict, Non
         doc_id (str): The ID of the document to check.
 
     Returns:
-        Union[Dict, None]: The document if it exists, None otherwise.
+        Optional[Dict[str, Any]]: The document if it exists, None otherwise.
     """
     try:
-        response = await es_async.get(index=index_name, id=doc_id, ignore=404)
+        # Convert doc_id to string to fix type error
+        doc_id_str = str(doc_id)
+        # Use ignore parameter directly as it's supported in the client
+        response = await es_async.get(index=index_name, id=doc_id_str, ignore=404)
         if response and response.get("found", False):
             logging.info(f"Document with id {doc_id} already exists in Elasticsearch.")
             return response["_source"]
         logging.info(f"Document with id {doc_id} does not exist in Elasticsearch.")
         return None
+    except es_exceptions.NotFoundError:
+        logging.info(f"Document with id {doc_id} does not exist in Elasticsearch.")
+        return None
+    except es_exceptions.ConnectionError as e:
+        # This is a connection error that the client will retry
+        logging.warning(f"Connection error while checking document {doc_id}, client will retry: {e}")
+        raise
+    except es_exceptions.TransportError as e:
+        # This is a transport error that the client will retry
+        logging.warning(f"Transport error while checking document {doc_id}, client will retry: {e}")
+        raise
     except Exception as e:
         logging.error(
             f"Failed to check existence of document with id {doc_id}. Error: {e}"
         )
-        return None
+        raise
 
 
 async def count_doc_es(
     index_name: str, field_name: str, field_value: str
-) -> Union[int, None]:
+) -> Optional[int]:
     from .client import es_async
 
     """
@@ -124,7 +161,7 @@ async def count_doc_es(
         field_value (str): The value to match for the field.
 
     Returns:
-        Union[int, None]: The count of documents if successful, None otherwise.
+        Optional[int]: The count of documents if successful, None otherwise.
     """
     query = {"query": {"term": {field_name: field_value}}}
 
@@ -139,6 +176,14 @@ async def count_doc_es(
             f"No documents found in index {index_name} where {field_name} = {field_value}."
         )
         return 0
+    except es_exceptions.ConnectionError as e:
+        # This is a connection error that the client will retry
+        logging.warning(f"Connection error while counting documents, client will retry: {e}")
+        raise
+    except es_exceptions.TransportError as e:
+        # This is a transport error that the client will retry
+        logging.warning(f"Transport error while counting documents, client will retry: {e}")
+        raise
     except Exception as e:
         logging.error(f"Failed to count documents in index {index_name}. Error: {e}")
-        return None
+        raise
