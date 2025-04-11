@@ -187,3 +187,24 @@ async def count_doc_es(
     except Exception as e:
         logging.error(f"Failed to count documents in index {index_name}. Error: {e}")
         raise
+
+async def search_all_documents(index):
+    from .client import es_async
+    resp = await es_async.search(index=index, body={"query": {"match_all": {}}, "size": 10000})
+    return resp['hits']['hits']
+
+async def count_doc_es(index, field, value):
+    from .client import es_async
+    query = {
+        "query": {
+            "term": {
+                field: value
+            }
+        }
+    }
+    try:
+        resp = await es_async.count(index=index, body=query)
+        return resp['count']
+    except Exception as e:
+        logging.error(f"Error counting documents: {e}")
+        return None
