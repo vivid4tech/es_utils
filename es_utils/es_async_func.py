@@ -188,9 +188,13 @@ async def count_doc_es(
         logging.error(f"Failed to count documents in index {index_name}. Error: {e}")
         raise
 
-async def search_all_documents(index):
+async def search_all_documents(index, sort_field="id"):
     from .client import es_async
-    resp = await es_async.search(index=index, body={"query": {"match_all": {}}, "size": 10000})
+    resp = await es_async.search(index=index, body={
+        "query": {"match_all": {}}, 
+        "size": 10000,
+        "sort": [{f"{sort_field}.keyword": {"order": "asc"}}]
+    })
     return resp['hits']['hits']
 
 async def count_doc_es(index, field, value):
@@ -208,3 +212,45 @@ async def count_doc_es(index, field, value):
     except Exception as e:
         logging.error(f"Error counting documents: {e}")
         return None
+Z
+async def bulk_documents_exist(index_name: str, docs_to_check: list) -> dict:
+    """
+    Check if multiple documents exist in Elasticsearch using the mget API.
+    
+    Args:
+        index_name (str): The name of the Elasticsearch index.
+        docs_to_check (list): List of document IDs to check.
+        
+    Returns:
+        dict: Dictionary mapping document IDs to boolean existence values.
+    """
+    from .client import es_async
+    
+    if not docs_to_check:
+        return {}
+    
+    try:
+        # Prepare the mget query
+        body = {"docs": [{"_id": doc["_id"]} for doc in docs_to_check]}
+        
+        # Execute the mget query
+        response = await es_async.mget(body=body, index=index_name)
+        
+        # Process the results
+        results = {}
+        if "docs" in response:
+            for doc in response["docs"]:
+                doc_id = doc["_id"]
+                results[doc_id] = doc.get("found", False)
+        
+        return results
+    except es_exceptions.ConnectionError as e:
+        logging.warning(f"Connection error while checking document batch, client will retry: {e}")
+        raise
+    except es_exceptions.TransportError as e:
+        logging.warning(f"Transport error while checking document batch, client will retry: {e}")
+        raise
+    except Exception as e:
+        logging.error(f"Error checking batch of documents: {e}")
+        # Return empty dict on error to avoid breaking the calling function
+        return {}
