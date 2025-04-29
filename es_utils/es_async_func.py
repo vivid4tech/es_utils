@@ -212,7 +212,7 @@ async def count_doc_es(index, field, value):
     except Exception as e:
         logging.error(f"Error counting documents: {e}")
         return None
-Z
+
 async def bulk_documents_exist(index_name: str, docs_to_check: list) -> dict:
     """
     Check if multiple documents exist in Elasticsearch using the mget API.
