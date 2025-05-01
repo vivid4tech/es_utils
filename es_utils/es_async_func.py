@@ -197,6 +197,25 @@ async def search_all_documents(index, sort_field="id"):
     })
     return resp['hits']['hits']
 
+async def search_documents(index_name: str, query: dict) -> dict:
+    """
+    Search for documents in Elasticsearch with a specific query.
+    
+    Args:
+        index_name (str): The name of the Elasticsearch index.
+        query (dict): The query to search for documents.
+        
+    Returns:
+        dict: The search results.
+    """
+    from .client import es_async
+    try:
+        response = await es_async.search(index=index_name, body=query)
+        return response
+    except Exception as e:
+        logging.error(f"Error searching documents: {e}")
+        return {"hits": {"hits": []}}
+
 async def count_doc_es(index, field, value):
     from .client import es_async
     query = {
