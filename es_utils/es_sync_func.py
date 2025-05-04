@@ -1,7 +1,8 @@
-import logging
 import json
+import logging
+from typing import Dict, Optional, Tuple, Union
+
 from elasticsearch import exceptions as es_exceptions
-from typing import Union, Dict, Optional, Tuple
 
 
 def test_es_connection() -> bool:
@@ -25,7 +26,7 @@ def test_es_connection() -> bool:
         return False
 
 
-def create_index(index_name: str) -> int:
+def create_index(index_name: str, settings_path: str = "json/settings.json") -> int:
     from .client import es_sync
 
     """
@@ -33,6 +34,8 @@ def create_index(index_name: str) -> int:
 
     Args:
         index_name (str): The name of the index to be created.
+        settings_path (str, optional): Path to the JSON file containing index settings.
+                                       Defaults to "json/settings.json".
 
     Returns:
         int: Returns 1 if the index is created successfully,
@@ -42,7 +45,7 @@ def create_index(index_name: str) -> int:
     try:
         if not es_sync.indices.exists(index=index_name):
             try:
-                with open("json/settings.json", "r") as file:
+                with open(settings_path, "r") as file:
                     index_config = json.load(file)
             except FileNotFoundError as fnf_error:
                 logging.error(f"Settings file not found: {fnf_error}")
