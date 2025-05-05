@@ -51,10 +51,16 @@ def create_index(index_name: str, settings_path: str = "json/settings.json") -> 
                 logging.error(f"Settings file not found: {fnf_error}")
                 return -1
 
-            # Use ignore parameter directly
-            es_sync.indices.create(index=index_name, body=index_config, ignore=400)
-            logging.info(f"Created index {index_name}")
-            return 1
+            try:
+                es_sync.indices.create(index=index_name, body=index_config)
+                logging.info(f"Created index {index_name}")
+                return 1
+            except es_exceptions.RequestError as e:
+                if e.error == 'resource_already_exists_exception':
+                    logging.info(f"Index {index_name} already exists")
+                    return 0
+                logging.error(f"Failed to create index: {e}")
+                return -1
         else:
             logging.info(f"Index {index_name} already exists")
             return 0
@@ -120,17 +126,17 @@ def doc_exist_in_es(index_name: str, doc_id: str) -> bool:
         bool: True if the document exists, False otherwise.
     """
     try:
-        # Use ignore parameter directly
-        response = es_sync.get(index=index_name, id=doc_id, ignore=404)
-        if response and response.get("found", False):
-            logging.info(f"Document {doc_id} already exists in index {index_name}")
-            return True
+        try:
+            response = es_sync.get(index=index_name, id=doc_id)
+            if response and response.get("found", False):
+                logging.info(f"Document {doc_id} already exists in index {index_name}")
+                return True
+        except es_exceptions.NotFoundError:
+            logging.info(f"Document {doc_id} does not exist in index {index_name}")
+            return False
         else:
             logging.info(f"Document {doc_id} does not exist in index {index_name}")
             return False
-    except es_exceptions.NotFoundError:
-        logging.info(f"Document {doc_id} does not exist in index {index_name}")
-        return False
     except es_exceptions.ConnectionError as e:
         # This is a connection error that the client will retry
         logging.warning(f"Connection error while checking document {doc_id}, client will retry: {e}")

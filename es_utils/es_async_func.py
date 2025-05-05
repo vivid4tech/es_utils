@@ -1,6 +1,7 @@
 import logging
+from typing import Any, Dict, Optional, Union
+
 from elasticsearch import exceptions as es_exceptions
-from typing import Union, Dict, Any, Optional
 
 
 async def add_document_to_index(index_name: str, doc: dict) -> bool:
@@ -122,15 +123,15 @@ async def document_exists_in_es(index_name: str, doc_id: str) -> Optional[Dict[s
     try:
         # Convert doc_id to string to fix type error
         doc_id_str = str(doc_id)
-        # Use ignore parameter directly as it's supported in the client
-        response = await es_async.get(index=index_name, id=doc_id_str, ignore=404)
-        if response and response.get("found", False):
-            logging.info(f"Document with id {doc_id} already exists in Elasticsearch.")
-            return response["_source"]
-        logging.info(f"Document with id {doc_id} does not exist in Elasticsearch.")
-        return None
-    except es_exceptions.NotFoundError:
-        logging.info(f"Document with id {doc_id} does not exist in Elasticsearch.")
+        # Instead of using ignore parameter, handle 404 through exception handling
+        try:
+            response = await es_async.get(index=index_name, id=doc_id_str)
+            if response and response.get("found", False):
+                logging.info(f"Document with id {doc_id} already exists in Elasticsearch.")
+                return response["_source"]
+        except es_exceptions.NotFoundError:
+            logging.info(f"Document with id {doc_id} does not exist in Elasticsearch.")
+            return None
         return None
     except es_exceptions.ConnectionError as e:
         # This is a connection error that the client will retry
@@ -147,7 +148,7 @@ async def document_exists_in_es(index_name: str, doc_id: str) -> Optional[Dict[s
         raise
 
 
-async def count_doc_es(
+async def count_documents(
     index_name: str, field_name: str, field_value: str
 ) -> Optional[int]:
     from .client import es_async
@@ -197,7 +198,7 @@ async def search_all_documents(index, sort_field="id"):
     })
     return resp['hits']['hits']
 
-async def search_documents(index_name: str, query: dict) -> dict:
+async def search_documents(index_name: str, query: dict) -> Any:
     """
     Search for documents in Elasticsearch with a specific query.
     
@@ -206,7 +207,7 @@ async def search_documents(index_name: str, query: dict) -> dict:
         query (dict): The query to search for documents.
         
     Returns:
-        dict: The search results.
+        Any: The search results.
     """
     from .client import es_async
     try:
@@ -215,22 +216,6 @@ async def search_documents(index_name: str, query: dict) -> dict:
     except Exception as e:
         logging.error(f"Error searching documents: {e}")
         return {"hits": {"hits": []}}
-
-async def count_doc_es(index, field, value):
-    from .client import es_async
-    query = {
-        "query": {
-            "term": {
-                field: value
-            }
-        }
-    }
-    try:
-        resp = await es_async.count(index=index, body=query)
-        return resp['count']
-    except Exception as e:
-        logging.error(f"Error counting documents: {e}")
-        return None
 
 async def bulk_documents_exist(index_name: str, docs_to_check: list) -> dict:
     """
