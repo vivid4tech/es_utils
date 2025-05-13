@@ -1,6 +1,5 @@
 import json
 import logging
-from typing import Dict, Optional, Tuple, Union
 
 from elasticsearch import exceptions as es_exceptions
 
@@ -45,7 +44,7 @@ def create_index(index_name: str, settings_path: str = "json/settings.json") -> 
     try:
         if not es_sync.indices.exists(index=index_name):
             try:
-                with open(settings_path, "r") as file:
+                with open(settings_path) as file:
                     index_config = json.load(file)
             except FileNotFoundError as fnf_error:
                 logging.error(f"Settings file not found: {fnf_error}")
@@ -72,7 +71,7 @@ def create_index(index_name: str, settings_path: str = "json/settings.json") -> 
         return -1
 
 
-def add_doc_to_index(index_name: str, doc: Dict[str, Union[str, int]]) -> bool:
+def add_doc_to_index(index_name: str, doc: dict[str, str | int]) -> bool:
     from .client import es_sync
 
     """
@@ -154,7 +153,7 @@ def doc_exist_in_es(index_name: str, doc_id: str) -> bool:
 
 def count_doc_es(
     index_name: str, field_name: str, field_value: str
-) -> Optional[int]:
+) -> int | None:
     from .client import es_sync
 
     """
@@ -194,7 +193,7 @@ def count_doc_es(
         return None
 
 
-def get_last_doc_id(index_name: str) -> Union[str, int]:
+def get_last_doc_id(index_name: str) -> str | int:
     from .client import es_sync
 
     """
@@ -227,7 +226,7 @@ def get_last_doc_id(index_name: str) -> Union[str, int]:
         return 0
 
 
-def get_latest_value(index_name: str, field_name: str) -> Optional[str]:
+def get_latest_value(index_name: str, field_name: str) -> str | None:
     from .client import es_sync
 
     """
@@ -263,7 +262,7 @@ def get_latest_value(index_name: str, field_name: str) -> Optional[str]:
         return None
 
 
-def sync_document(index_name: str, doc_source: Dict[str, Union[str, int]]) -> bool:
+def sync_document(index_name: str, doc_source: dict[str, str | int]) -> bool:
     from .client import es_sync
 
     """
@@ -286,7 +285,7 @@ def sync_document(index_name: str, doc_source: Dict[str, Union[str, int]]) -> bo
 
         # Convert doc_id to string to fix type error
         doc_id_str = str(doc_id)
-        
+
         # Check if the document exists
         try:
             existing_doc = es_sync.get(index=index_name, id=doc_id_str)
@@ -350,19 +349,17 @@ def sync_document(index_name: str, doc_source: Dict[str, Union[str, int]]) -> bo
         )
         return False
 
-def get_latest_es_doc_info(index_name: str) -> Tuple[int, Optional[str]]:
+def get_latest_es_doc_info(index_name: str) -> tuple[int, str | None]:
     """
     Get the largest document ID and latest publication date from Elasticsearch.
     These may come from different documents.
-    
     Args:
         index_name (str): The name of the Elasticsearch index
-        
     Returns:
         Tuple[int, Optional[str]]: Tuple containing (largest_id, latest_dt_wyd)
     """
     from .client import es_sync
-    
+
     try:
         # Get document with highest ID
         id_query = {
@@ -371,11 +368,11 @@ def get_latest_es_doc_info(index_name: str) -> Tuple[int, Optional[str]]:
             "_source": False
         }
         id_response = es_sync.search(index=index_name, body=id_query)
-        
+
         largest_id = 0
         if id_response["hits"]["hits"]:
             largest_id = int(id_response["hits"]["hits"][0]["_id"])
-            
+
         # Get document with latest publication date
         date_query = {
             "size": 1,
@@ -383,15 +380,15 @@ def get_latest_es_doc_info(index_name: str) -> Tuple[int, Optional[str]]:
             "_source": ["dokument.DT_WYD"]
         }
         date_response = es_sync.search(index=index_name, body=date_query)
-        
+
         latest_dt_wyd = None
         if date_response["hits"]["hits"]:
             source = date_response["hits"]["hits"][0]["_source"]
             if "dokument" in source and "DT_WYD" in source["dokument"]:
                 latest_dt_wyd = source["dokument"]["DT_WYD"]
-        
+
         return largest_id, latest_dt_wyd
-        
+
     except es_exceptions.ConnectionError as e:
         # This is a connection error that the client will retry
         logging.warning(f"Connection error while getting latest document info, client will retry: {e}")
