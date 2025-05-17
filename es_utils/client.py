@@ -1,6 +1,4 @@
-from elasticsearch import AsyncElasticsearch
-from elasticsearch import Elasticsearch
-
+from elasticsearch import AsyncElasticsearch, Elasticsearch
 
 if "es_async" not in globals():
     es_async = None

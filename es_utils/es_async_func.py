@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 from elasticsearch import exceptions as es_exceptions
 
@@ -47,8 +47,8 @@ async def add_document_to_index(index_name: str, doc: dict) -> bool:
 
 async def sync_document(
     index_name: str,
-    doc_source: Dict[str, Union[str, int]],
-    doc_es: Dict[str, Union[str, int]],
+    doc_source: dict[str, str | int],
+    doc_es: dict[str, str | int],
 ) -> bool:
     from .client import es_async
 
@@ -108,7 +108,7 @@ async def sync_document(
         raise
 
 
-async def document_exists_in_es(index_name: str, doc_id: str) -> Optional[Dict[str, Any]]:
+async def document_exists_in_es(index_name: str, doc_id: str) -> dict[str, Any] | None:
     from .client import es_async
 
     """Check if a document exists in Elasticsearch index and return the document if it exists.
@@ -150,7 +150,7 @@ async def document_exists_in_es(index_name: str, doc_id: str) -> Optional[Dict[s
 
 async def count_documents(
     index_name: str, field_name: str, field_value: str
-) -> Optional[int]:
+) -> int | None:
     from .client import es_async
 
     """
@@ -192,7 +192,7 @@ async def count_documents(
 async def search_all_documents(index, sort_field="id"):
     from .client import es_async
     resp = await es_async.search(index=index, body={
-        "query": {"match_all": {}}, 
+        "query": {"match_all": {}},
         "size": 10000,
         "sort": [{f"{sort_field}.keyword": {"order": "asc"}}]
     })
@@ -201,11 +201,9 @@ async def search_all_documents(index, sort_field="id"):
 async def search_documents(index_name: str, query: dict) -> Any:
     """
     Search for documents in Elasticsearch with a specific query.
-    
     Args:
         index_name (str): The name of the Elasticsearch index.
         query (dict): The query to search for documents.
-        
     Returns:
         Any: The search results.
     """
@@ -220,33 +218,31 @@ async def search_documents(index_name: str, query: dict) -> Any:
 async def bulk_documents_exist(index_name: str, docs_to_check: list) -> dict:
     """
     Check if multiple documents exist in Elasticsearch using the mget API.
-    
     Args:
         index_name (str): The name of the Elasticsearch index.
         docs_to_check (list): List of document IDs to check.
-        
     Returns:
         dict: Dictionary mapping document IDs to boolean existence values.
     """
     from .client import es_async
-    
+
     if not docs_to_check:
         return {}
-    
+
     try:
         # Prepare the mget query
         body = {"docs": [{"_id": doc["_id"]} for doc in docs_to_check]}
-        
+
         # Execute the mget query
         response = await es_async.mget(body=body, index=index_name)
-        
+
         # Process the results
         results = {}
         if "docs" in response:
             for doc in response["docs"]:
                 doc_id = doc["_id"]
                 results[doc_id] = doc.get("found", False)
-        
+
         return results
     except es_exceptions.ConnectionError as e:
         logging.warning(f"Connection error while checking document batch, client will retry: {e}")
