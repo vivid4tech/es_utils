@@ -433,3 +433,61 @@ def get_latest_es_doc_info(index_name: str) -> tuple[int, str | None]:
     except Exception as e:
         logging.error(f"Error getting latest document info from Elasticsearch: {e}")
         return 0, None
+
+def update_document(index_name: str, doc_id: str, update_fields: dict) -> bool:
+    """
+    Update specific fields of a document in Elasticsearch.
+    Args:
+        index_name (str): The name of the Elasticsearch index
+        doc_id (str): The ID of the document to update
+        update_fields (dict): Fields to update in the document
+    Returns:
+        bool: True if update was successful, False otherwise
+    """
+    from .client import es_sync
+    try:
+        response = es_sync.update(
+            index=index_name,
+            id=doc_id,
+            body={"doc": update_fields},
+            retry_on_conflict=3
+        )
+        return response.get("result") == "updated"
+    except Exception as e:
+        logging.error(f"Error updating document {doc_id}: {e}")
+        return False
+
+def get_document(index_name: str, doc_id: str) -> dict | None:
+    from .client import es_sync
+
+    """
+    Retrieve a document from Elasticsearch by its ID.
+
+    Args:
+        index_name (str): The name of the Elasticsearch index.
+        doc_id (str): The ID of the document to retrieve.
+
+    Returns:
+        Optional[dict]: The document if found, None otherwise.
+    """
+    try:
+        response = es_sync.get(index=index_name, id=str(doc_id))
+        if response and response.get("found", False):
+            logging.info(f"Successfully retrieved document {doc_id} from index {index_name}")
+            return response["_source"]
+        logging.info(f"Document {doc_id} not found in index {index_name}")
+        return None
+    except es_exceptions.NotFoundError:
+        logging.info(f"Document {doc_id} not found in index {index_name}")
+        return None
+    except es_exceptions.ConnectionError as e:
+        # This is a connection error that the client will retry
+        logging.warning(f"Connection error while retrieving document {doc_id}, client will retry: {e}")
+        raise
+    except es_exceptions.TransportError as e:
+        # This is a transport error that the client will retry
+        logging.warning(f"Transport error while retrieving document {doc_id}, client will retry: {e}")
+        raise
+    except Exception as e:
+        logging.error(f"Failed to retrieve document with id {doc_id}. Error: {e}")
+        return None
