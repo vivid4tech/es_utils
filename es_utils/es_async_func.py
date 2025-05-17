@@ -66,26 +66,18 @@ async def sync_document(
     try:
         doc_id = doc_source.get("id", None)
         if not doc_id:
-            logging.warning(
-                f"Document does not contain an 'id' field. Document: {doc_source}"
-            )
+            logging.warning(f"Document does not contain an 'id' field. Document: {doc_source}")
             return False
         if doc_source != doc_es:
-            logging.info(
-                f"Document with id {doc_id}. New version found. Updating document."
-            )
+            logging.info(f"Document with id {doc_id}. New version found. Updating document.")
             # Convert doc_id to string to fix type error
             doc_id_str = str(doc_id)
             # Update the document if they are different
-            update_response = await es_async.index(
-                index=index_name, id=doc_id_str, document=doc_source
-            )
+            update_response = await es_async.index(index=index_name, id=doc_id_str, document=doc_source)
             if update_response.get("result") in ["created", "updated"]:
                 logging.info(f"Document with id {doc_id} has been updated.")
                 return True
-            logging.error(
-                f"Failed to update document with id {doc_id}. Response: {update_response}"
-            )
+            logging.error(f"Failed to update document with id {doc_id}. Response: {update_response}")
             return False
         else:
             logging.info(f"Document with id {doc_id} is already up-to-date.")
@@ -102,9 +94,7 @@ async def sync_document(
         logging.warning(f"Transport error while syncing document {doc_id}, client will retry: {e}")
         raise
     except Exception as e:
-        logging.error(
-            f"An unexpected error occurred while syncing document with id {doc_id}. Error: {e}"
-        )
+        logging.error(f"An unexpected error occurred while syncing document with id {doc_id}. Error: {e}")
         raise
 
 
@@ -142,15 +132,11 @@ async def document_exists_in_es(index_name: str, doc_id: str) -> dict[str, Any] 
         logging.warning(f"Transport error while checking document {doc_id}, client will retry: {e}")
         raise
     except Exception as e:
-        logging.error(
-            f"Failed to check existence of document with id {doc_id}. Error: {e}"
-        )
+        logging.error(f"Failed to check existence of document with id {doc_id}. Error: {e}")
         raise
 
 
-async def count_documents(
-    index_name: str, field_name: str, field_value: str
-) -> int | None:
+async def count_documents(index_name: str, field_name: str, field_value: str) -> int | None:
     from .client import es_async
 
     """
@@ -173,9 +159,7 @@ async def count_documents(
                 f"Found {response['count']} documents in index {index_name} where {field_name} = {field_value}."
             )
             return response["count"]
-        logging.info(
-            f"No documents found in index {index_name} where {field_name} = {field_value}."
-        )
+        logging.info(f"No documents found in index {index_name} where {field_name} = {field_value}.")
         return 0
     except es_exceptions.ConnectionError as e:
         # This is a connection error that the client will retry
@@ -189,14 +173,16 @@ async def count_documents(
         logging.error(f"Failed to count documents in index {index_name}. Error: {e}")
         raise
 
+
 async def search_all_documents(index, sort_field="id"):
     from .client import es_async
-    resp = await es_async.search(index=index, body={
-        "query": {"match_all": {}},
-        "size": 10000,
-        "sort": [{f"{sort_field}.keyword": {"order": "asc"}}]
-    })
-    return resp['hits']['hits']
+
+    resp = await es_async.search(
+        index=index,
+        body={"query": {"match_all": {}}, "size": 10000, "sort": [{f"{sort_field}.keyword": {"order": "asc"}}]},
+    )
+    return resp["hits"]["hits"]
+
 
 async def search_documents(index_name: str, query: dict) -> Any:
     """
@@ -208,12 +194,14 @@ async def search_documents(index_name: str, query: dict) -> Any:
         Any: The search results.
     """
     from .client import es_async
+
     try:
         response = await es_async.search(index=index_name, body=query)
         return response
     except Exception as e:
         logging.error(f"Error searching documents: {e}")
         return {"hits": {"hits": []}}
+
 
 async def bulk_documents_exist(index_name: str, docs_to_check: list) -> dict:
     """

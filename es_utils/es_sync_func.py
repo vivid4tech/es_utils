@@ -55,7 +55,7 @@ def create_index(index_name: str, settings_path: str = "json/settings.json") -> 
                 logging.info(f"Created index {index_name}")
                 return 1
             except es_exceptions.RequestError as e:
-                if e.error == 'resource_already_exists_exception':
+                if e.error == "resource_already_exists_exception":
                     logging.info(f"Index {index_name} already exists")
                     return 0
                 logging.error(f"Failed to create index: {e}")
@@ -145,15 +145,11 @@ def doc_exist_in_es(index_name: str, doc_id: str) -> bool:
         logging.warning(f"Transport error while checking document {doc_id}, client will retry: {e}")
         raise
     except Exception as e:
-        logging.error(
-            f"Failed to check existence of document with id {doc_id}. Error: {e}"
-        )
+        logging.error(f"Failed to check existence of document with id {doc_id}. Error: {e}")
         return False
 
 
-def count_doc_es(
-    index_name: str, field_name: str, field_value: str
-) -> int | None:
+def count_doc_es(index_name: str, field_name: str, field_value: str) -> int | None:
     from .client import es_sync
 
     """
@@ -176,9 +172,7 @@ def count_doc_es(
                 f"Found {response['count']} documents in index {index_name} where {field_name} = {field_value}."
             )
             return response["count"]
-        logging.info(
-            f"No documents found in index {index_name} where {field_name} = {field_value}."
-        )
+        logging.info(f"No documents found in index {index_name} where {field_name} = {field_value}.")
         return 0
     except es_exceptions.ConnectionError as e:
         # This is a connection error that the client will retry
@@ -220,9 +214,7 @@ def get_last_doc_id(index_name: str) -> str | int:
         logging.warning(f"Transport error while getting last document ID, client will retry: {e}")
         raise
     except Exception as e:
-        logging.error(
-            f"Failed to get last document ID: {e}. Possibly elasticsearch db is empty."
-        )
+        logging.error(f"Failed to get last document ID: {e}. Possibly elasticsearch db is empty.")
         return 0
 
 
@@ -311,9 +303,7 @@ def sync_document(index_name: str, doc_source: dict[str, str | int]) -> bool:
     try:
         doc_id = doc_source.get("id", None)
         if not doc_id:
-            logging.warning(
-                f"Document does not contain an 'id' field. Document: {doc_source}"
-            )
+            logging.warning(f"Document does not contain an 'id' field. Document: {doc_source}")
             return False
 
         # Convert doc_id to string to fix type error
@@ -337,33 +327,23 @@ def sync_document(index_name: str, doc_source: dict[str, str | int]) -> bool:
         if doc_exists:
             doc_es = existing_doc["_source"]
             if not _compare_docs(doc_source, doc_es):
-                logging.info(
-                    f"Document with id {doc_id}. New version found. Updating document."
-                )
-                update_response = es_sync.index(
-                    index=index_name, id=doc_id_str, document=doc_source
-                )
+                logging.info(f"Document with id {doc_id}. New version found. Updating document.")
+                update_response = es_sync.index(index=index_name, id=doc_id_str, document=doc_source)
                 if update_response["result"] in ["created", "updated"]:
                     logging.info(f"Document with id {doc_id} has been updated.")
                     return True
-                logging.error(
-                    f"Failed to update document with id {doc_id}. Response: {update_response}"
-                )
+                logging.error(f"Failed to update document with id {doc_id}. Response: {update_response}")
                 return False
             else:
                 logging.info(f"Document with id {doc_id} is already up-to-date.")
                 return True
         else:
             # Document doesn't exist, create it
-            create_response = es_sync.index(
-                index=index_name, id=doc_id_str, document=doc_source
-            )
+            create_response = es_sync.index(index=index_name, id=doc_id_str, document=doc_source)
             if create_response["result"] == "created":
                 logging.info(f"Document with id {doc_id} has been created.")
                 return True
-            logging.error(
-                f"Failed to create document with id {doc_id}. Response: {create_response}"
-            )
+            logging.error(f"Failed to create document with id {doc_id}. Response: {create_response}")
             return False
     except es_exceptions.RequestError as e:
         logging.error(f"Document with id {doc_id} failed to sync. Error: {e}")
@@ -377,10 +357,9 @@ def sync_document(index_name: str, doc_source: dict[str, str | int]) -> bool:
         logging.warning(f"Transport error while syncing document {doc_id}, client will retry: {e}")
         raise
     except Exception as e:
-        logging.error(
-            f"An unexpected error occurred while syncing document with id {doc_id}. Error: {e}"
-        )
+        logging.error(f"An unexpected error occurred while syncing document with id {doc_id}. Error: {e}")
         return False
+
 
 def get_latest_es_doc_info(index_name: str) -> tuple[int, str | None]:
     """
@@ -395,11 +374,7 @@ def get_latest_es_doc_info(index_name: str) -> tuple[int, str | None]:
 
     try:
         # Get document with highest ID
-        id_query = {
-            "size": 1,
-            "sort": [{"id": {"order": "desc"}}],
-            "_source": False
-        }
+        id_query = {"size": 1, "sort": [{"id": {"order": "desc"}}], "_source": False}
         id_response = es_sync.search(index=index_name, body=id_query)
 
         largest_id = 0
@@ -407,11 +382,7 @@ def get_latest_es_doc_info(index_name: str) -> tuple[int, str | None]:
             largest_id = int(id_response["hits"]["hits"][0]["_id"])
 
         # Get document with latest publication date
-        date_query = {
-            "size": 1,
-            "sort": [{"dokument.DT_WYD": {"order": "desc"}}],
-            "_source": ["dokument.DT_WYD"]
-        }
+        date_query = {"size": 1, "sort": [{"dokument.DT_WYD": {"order": "desc"}}], "_source": ["dokument.DT_WYD"]}
         date_response = es_sync.search(index=index_name, body=date_query)
 
         latest_dt_wyd = None
@@ -434,6 +405,7 @@ def get_latest_es_doc_info(index_name: str) -> tuple[int, str | None]:
         logging.error(f"Error getting latest document info from Elasticsearch: {e}")
         return 0, None
 
+
 def update_document(index_name: str, doc_id: str, update_fields: dict) -> bool:
     """
     Update specific fields of a document in Elasticsearch.
@@ -445,17 +417,14 @@ def update_document(index_name: str, doc_id: str, update_fields: dict) -> bool:
         bool: True if update was successful, False otherwise
     """
     from .client import es_sync
+
     try:
-        response = es_sync.update(
-            index=index_name,
-            id=doc_id,
-            body={"doc": update_fields},
-            retry_on_conflict=3
-        )
+        response = es_sync.update(index=index_name, id=doc_id, body={"doc": update_fields}, retry_on_conflict=3)
         return response.get("result") == "updated"
     except Exception as e:
         logging.error(f"Error updating document {doc_id}: {e}")
         return False
+
 
 def get_document(index_name: str, doc_id: str) -> dict | None:
     from .client import es_sync
