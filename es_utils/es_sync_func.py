@@ -265,17 +265,15 @@ def get_latest_value(index_name: str, field_name: str) -> str | None:
 def _compare_docs(doc1: dict, doc2: dict) -> bool:
     """
     Compare two documents while ignoring order in lists.
-    
     Args:
         doc1 (dict): First document to compare
         doc2 (dict): Second document to compare
-        
     Returns:
         bool: True if documents are equivalent, False otherwise
     """
     if doc1.keys() != doc2.keys():
         return False
-        
+
     for key in doc1:
         if isinstance(doc1[key], dict) and isinstance(doc2[key], dict):
             if not _compare_docs(doc1[key], doc2[key]):
@@ -288,7 +286,7 @@ def _compare_docs(doc1: dict, doc2: dict) -> bool:
             if all(isinstance(x, dict) for x in doc1[key]) and all(isinstance(x, dict) for x in doc2[key]):
                 sorted1 = sorted(doc1[key], key=lambda x: str(sorted(x.items())))
                 sorted2 = sorted(doc2[key], key=lambda x: str(sorted(x.items())))
-                if not all(_compare_docs(a, b) for a, b in zip(sorted1, sorted2)):
+                if not all(_compare_docs(a, b) for a, b in zip(sorted1, sorted2, strict=False)):
                     return False
             elif doc1[key] != doc2[key]:
                 return False
