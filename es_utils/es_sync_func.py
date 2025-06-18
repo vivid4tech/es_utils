@@ -460,3 +460,37 @@ def get_document(index_name: str, doc_id: str) -> dict | None:
     except Exception as e:
         logging.error(f"Failed to retrieve document with id {doc_id}. Error: {e}")
         return None
+
+def delete_document(index_name: str, doc_id: str) -> bool:
+    """
+    Delete a document from Elasticsearch by its ID.
+    Args:
+        index_name (str): The name of the Elasticsearch index
+        doc_id (str): The ID of the document to delete
+    Returns:
+        bool: True if deletion was successful, False otherwise
+    """
+    from .client import es_sync
+    
+    try:
+        response = es_sync.delete(index=index_name, id=str(doc_id))
+        if response.get("result") == "deleted":
+            logging.info(f"Successfully deleted document {doc_id} from index {index_name}")
+            return True
+        else:
+            logging.warning(f"Document {doc_id} deletion result: {response.get('result', 'unknown')}")
+            return False
+    except es_exceptions.NotFoundError:
+        logging.info(f"Document {doc_id} not found in index {index_name} (already deleted)")
+        return True  # Consider as successful since document doesn't exist
+    except es_exceptions.ConnectionError as e:
+        # This is a connection error that the client will retry
+        logging.warning(f"Connection error while deleting document {doc_id}, client will retry: {e}")
+        raise
+    except es_exceptions.TransportError as e:
+        # This is a transport error that the client will retry
+        logging.warning(f"Transport error while deleting document {doc_id}, client will retry: {e}")
+        raise
+    except Exception as e:
+        logging.error(f"Failed to delete document {doc_id} from index {index_name}: {e}")
+        return False
