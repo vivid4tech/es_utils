@@ -471,7 +471,7 @@ def delete_document(index_name: str, doc_id: str) -> bool:
         bool: True if deletion was successful, False otherwise
     """
     from .client import es_sync
-    
+
     try:
         response = es_sync.delete(index=index_name, id=str(doc_id))
         if response.get("result") == "deleted":
