@@ -25,7 +25,7 @@ def test_es_connection() -> bool:
         return False
 
 
-def create_index(index_name: str, settings_path: str = "json/settings.json") -> int:
+def create_index(index_name: str, settings_path: str = "json/es_settings.json") -> int:
     from .client import es_sync
 
     """
@@ -34,7 +34,7 @@ def create_index(index_name: str, settings_path: str = "json/settings.json") -> 
     Args:
         index_name (str): The name of the index to be created.
         settings_path (str, optional): Path to the JSON file containing index settings.
-                                       Defaults to "json/settings.json".
+                                       Defaults to "json/es_settings.json".
 
     Returns:
         int: Returns 1 if the index is created successfully,
